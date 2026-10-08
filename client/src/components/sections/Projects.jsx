@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 
@@ -70,6 +71,24 @@ function Projects() {
                 className="project-card"
                 key={project.id}
               >
+                {project.image ? (
+                  <div className="project-image-wrapper">
+                    <img
+                      src={project.image}
+                      alt={`${project.title || "ZTECH project"} preview`}
+                      className="project-image"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="project-image-wrapper project-image-placeholder"
+                    aria-hidden="true"
+                  >
+                    <span>ZTECH</span>
+                  </div>
+                )}
+
                 <div className="project-top">
                   <span className="project-number">
                     {String(index + 1).padStart(2, "0")}

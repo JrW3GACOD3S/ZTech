@@ -13,14 +13,16 @@ import Contact from "./components/sections/Contact";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProtectedAdminRoute from "./pages/admin/ProtectedAdminRoute";
+
 import ProjectsManager from "./pages/admin/projects/ProjectsManager";
 import AddProject from "./pages/admin/projects/AddProject";
 import EditProject from "./pages/admin/projects/EditProject";
+
 import ServicesManager from "./pages/admin/services/ServicesManager";
 import AddService from "./pages/admin/services/AddService";
 import EditService from "./pages/admin/services/EditService";
-import RequestsManager from "./pages/admin/requests/RequestsManager";
 
+import RequestsManager from "./pages/admin/requests/RequestsManager";
 
 import "./App.css";
 
@@ -47,6 +49,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+
         {/* Public website */}
         <Route path="/" element={<Home />} />
 
@@ -63,7 +66,7 @@ function App() {
           }
         />
 
-        {/* Project management */}
+        {/* Projects */}
         <Route
           path="/admin/projects"
           element={
@@ -72,56 +75,63 @@ function App() {
             </ProtectedAdminRoute>
           }
         />
+
         <Route
-  path="/admin/projects/new"
-  element={
-    <ProtectedAdminRoute>
-      <AddProject />
-    </ProtectedAdminRoute>
-  }
-/>
-<Route
-  path="/admin/projects/edit/:projectId"
-  element={
-    <ProtectedAdminRoute>
-      <EditProject />
-    </ProtectedAdminRoute>
-  }
-/>
-<Route
-  path="/admin/services"
-  element={
-    <ProtectedAdminRoute>
-      <ServicesManager />
-    </ProtectedAdminRoute>
-  }
-/>
+          path="/admin/projects/new"
+          element={
+            <ProtectedAdminRoute>
+              <AddProject />
+            </ProtectedAdminRoute>
+          }
+        />
 
-<Route
-  path="/admin/requests"
-  element={
-    <ProtectedAdminRoute>
-      <RequestsManager />
-    </ProtectedAdminRoute>
-  }
-/>
+        <Route
+          path="/admin/projects/edit/:projectId"
+          element={
+            <ProtectedAdminRoute>
+              <EditProject />
+            </ProtectedAdminRoute>
+          }
+        />
 
-<Route
-  path="/admin/services/new"
-  element={
-    <ProtectedAdminRoute>
-      <AddService />
-    </ProtectedAdminRoute>
-  }
-/>
-<Route
-  path="/admin/services/edit/:serviceId"
-  element={
-    <ProtectedAdminRoute>
-      <EditService />
-    </ProtectedAdminRoute>
-  }
-/>
+        {/* Services */}
+        <Route
+          path="/admin/services"
+          element={
+            <ProtectedAdminRoute>
+              <ServicesManager />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/services/new"
+          element={
+            <ProtectedAdminRoute>
+              <AddService />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/services/edit/:serviceId"
+          element={
+            <ProtectedAdminRoute>
+              <EditService />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        {/* Client requests */}
+        <Route
+          path="/admin/requests"
+          element={
+            <ProtectedAdminRoute>
+              <RequestsManager />
+            </ProtectedAdminRoute>
+          }
+        />
+
       </Routes>
     </BrowserRouter>
   );
