@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   updateDoc,
@@ -15,6 +16,8 @@ function RequestsManager() {
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
     const requestsRef = collection(db, "requests");
@@ -39,6 +42,10 @@ function RequestsManager() {
       },
       (error) => {
         console.error("Failed to load requests:", error);
+        setNotice({
+          type: "error",
+          text: "Failed to load requests. Please refresh the page.",
+        });
         setLoading(false);
       }
     );
@@ -47,14 +54,53 @@ function RequestsManager() {
   }, []);
 
   const updateStatus = async (requestId, status) => {
+    setNotice(null);
+
     try {
       await updateDoc(doc(db, "requests", requestId), {
         status,
         updatedAt: new Date(),
       });
+
+      setNotice({
+        type: "success",
+        text: "Request status updated successfully.",
+      });
     } catch (error) {
       console.error("Failed to update request status:", error);
-      alert("Failed to update request status.");
+      setNotice({
+        type: "error",
+        text: "Failed to update request status. Please try again.",
+      });
+    }
+  };
+
+  const deleteRequest = async (request) => {
+    const clientName = request.name || "this client";
+    const confirmed = window.confirm(
+      `Permanently delete the project request from ${clientName}?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(request.id);
+    setNotice(null);
+
+    try {
+      await deleteDoc(doc(db, "requests", request.id));
+
+      setNotice({
+        type: "success",
+        text: `Request from ${clientName} was deleted successfully.`,
+      });
+    } catch (error) {
+      console.error("Failed to delete request:", error);
+      setNotice({
+        type: "error",
+        text: "Failed to delete this request. Check your admin permissions and try again.",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -88,9 +134,7 @@ function RequestsManager() {
         <div className="admin-manager-header">
           <div>
             <p className="admin-eyebrow">CLIENT MANAGEMENT</p>
-
             <h1>Project Requests</h1>
-
             <span>
               View and manage project requests submitted through the ZTECH
               website.
@@ -105,6 +149,29 @@ function RequestsManager() {
             ← Dashboard
           </button>
         </div>
+
+        {notice && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              padding: "14px 18px",
+              marginBottom: "20px",
+              borderRadius: "10px",
+              border:
+                notice.type === "success"
+                  ? "1px solid rgba(34, 197, 94, 0.35)"
+                  : "1px solid rgba(239, 68, 68, 0.4)",
+              background:
+                notice.type === "success"
+                  ? "rgba(34, 197, 94, 0.08)"
+                  : "rgba(239, 68, 68, 0.08)",
+              color: notice.type === "success" ? "#4ade80" : "#f87171",
+            }}
+          >
+            {notice.text}
+          </div>
+        )}
 
         {!loading && requests.length > 0 && (
           <div className="admin-request-stats">
@@ -137,9 +204,7 @@ function RequestsManager() {
         ) : requests.length === 0 ? (
           <div className="admin-empty-state">
             <div className="admin-empty-icon">+</div>
-
             <h2>No requests yet</h2>
-
             <p>
               Project requests submitted through the website will appear
               here.
@@ -168,19 +233,11 @@ function RequestsManager() {
                       {request.service || "General Request"}
                     </span>
 
-                    <h2>
-                      {request.name || "Unknown Client"}
-                    </h2>
+                    <h2>{request.name || "Unknown Client"}</h2>
 
-                    {request.company ? (
-                      <p className="admin-request-company">
-                        {request.company}
-                      </p>
-                    ) : (
-                      <p className="admin-request-company">
-                        Individual Client
-                      </p>
-                    )}
+                    <p className="admin-request-company">
+                      {request.company || "Individual Client"}
+                    </p>
                   </div>
 
                   <div className="admin-request-status-wrapper">
@@ -189,10 +246,7 @@ function RequestsManager() {
                     <select
                       value={request.status || "New"}
                       onChange={(event) =>
-                        updateStatus(
-                          request.id,
-                          event.target.value
-                        )
+                        updateStatus(request.id, event.target.value)
                       }
                       className={`admin-request-status status-${(
                         request.status || "New"
@@ -201,18 +255,10 @@ function RequestsManager() {
                         .replace(/\s+/g, "-")}`}
                     >
                       <option value="New">New</option>
-                      <option value="Contacted">
-                        Contacted
-                      </option>
-                      <option value="In Progress">
-                        In Progress
-                      </option>
-                      <option value="Completed">
-                        Completed
-                      </option>
-                      <option value="Archived">
-                        Archived
-                      </option>
+                      <option value="Contacted">Contacted</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Archived">Archived</option>
                     </select>
                   </div>
                 </div>
@@ -220,19 +266,14 @@ function RequestsManager() {
                 <div className="admin-request-details">
                   <div className="admin-request-detail">
                     <span>Email</span>
-
-                    <a href={`mailto:${request.email}`}>
-                      {request.email}
+                    <a href={`mailto:${request.email || ""}`}>
+                      {request.email || "Not provided"}
                     </a>
                   </div>
 
                   <div className="admin-request-detail">
                     <span>Service Requested</span>
-
-                    <p>
-                      {request.service ||
-                        "Not specified"}
-                    </p>
+                    <p>{request.service || "Not specified"}</p>
                   </div>
                 </div>
 
@@ -248,27 +289,45 @@ function RequestsManager() {
                 </div>
 
                 <div className="admin-request-actions">
-                  <a
-                    href={`mailto:${request.email}?subject=ZTECH Project Request`}
-                    className="admin-secondary-button"
-                  >
-                    Email Client ↗
-                  </a>
+                  {request.email && (
+                    <a
+                      href={`mailto:${request.email}?subject=ZTECH Project Request`}
+                      className="admin-secondary-button"
+                    >
+                      Email Client ↗
+                    </a>
+                  )}
 
                   <button
                     type="button"
                     className="admin-primary-button"
-                    onClick={() =>
-                      updateStatus(
-                        request.id,
-                        "Contacted"
-                      )
-                    }
-                    disabled={
-                      request.status === "Contacted"
-                    }
+                    onClick={() => updateStatus(request.id, "Contacted")}
+                    disabled={request.status === "Contacted"}
                   >
                     Mark as Contacted
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => deleteRequest(request)}
+                    disabled={deletingId === request.id}
+                    style={{
+                      padding: "12px 18px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(239, 68, 68, 0.45)",
+                      background: "rgba(239, 68, 68, 0.1)",
+                      color: "#f87171",
+                      fontWeight: 600,
+                      cursor:
+                        deletingId === request.id
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity: deletingId === request.id ? 0.6 : 1,
+                    }}
+                  >
+                    {deletingId === request.id
+                      ? "Deleting..."
+                      : "Delete Request"}
                   </button>
                 </div>
               </article>

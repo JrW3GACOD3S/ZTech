@@ -55,27 +55,57 @@ function Services() {
         </div>
 
         {loading ? (
+          <div className="services-loading">Loading services...</div>
+        ) : services.length === 0 ? (
           <div className="services-loading">
-            Loading services...
+            Our services are being updated. Please check back soon.
           </div>
         ) : (
           <div className="services-grid">
             {services.map((service, index) => (
-              <article
-                className="service-card"
-                key={service.id}
-              >
+              <article className="service-card" key={service.id}>
                 <span className="service-number">
                   {String(index + 1).padStart(2, "0")}
                 </span>
 
+                {service.image && (
+                  <div
+                    className="service-card-image"
+                    style={{
+                      width: "100%",
+                      aspectRatio: "16 / 9",
+                      overflow: "hidden",
+                      borderRadius: "10px",
+                      marginBottom: "20px",
+                      backgroundColor: "#1f1f1f",
+                    }}
+                  >
+                    <img
+                      src={service.image}
+                      alt={service.name || "ZTECH service"}
+                      loading="lazy"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      onError={(event) => {
+                        event.currentTarget.parentElement.style.display =
+                          "none";
+                      }}
+                    />
+                  </div>
+                )}
+
                 <div className="service-card-content">
                   <h3>{service.name}</h3>
-
                   <p>{service.description}</p>
                 </div>
 
-                <span className="service-arrow">↗</span>
+                <span className="service-arrow" aria-hidden="true">
+                  ↗
+                </span>
               </article>
             ))}
           </div>

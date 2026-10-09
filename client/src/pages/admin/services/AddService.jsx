@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   addDoc,
   collection,
@@ -9,6 +9,16 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../../../config/firebase";
 import AdminLayout from "../../../components/admin/AdminLayout";
 
+const CLOUDINARY_CLOUD_NAME = "rwllkept";
+const CLOUDINARY_UPLOAD_PRESET = "ztech_images";
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
 function AddService() {
   const navigate = useNavigate();
 
@@ -16,12 +26,27 @@ function AddService() {
     name: "",
     description: "",
     icon: "",
+    image: "",
     order: 1,
     active: true,
   });
 
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!selectedImage) {
+      setPreviewUrl("");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(selectedImage);
+    setPreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedImage]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -32,6 +57,66 @@ function AddService() {
     }));
   };
 
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+
+    setError("");
+
+    if (!file) {
+      setSelectedImage(null);
+      return;
+    }
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setError("Choose a JPG, PNG, or WebP image.");
+      event.target.value = "";
+      setSelectedImage(null);
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError("The image must be 5 MB or smaller.");
+      event.target.value = "";
+      setSelectedImage(null);
+      return;
+    }
+
+    setSelectedImage(file);
+
+    setFormData((previous) => ({
+      ...previous,
+      image: "",
+    }));
+  };
+
+  const uploadImage = async (file) => {
+    const uploadUrl =
+      `https://api.cloudinary.com/v1_1/` +
+      `${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+    uploadData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    uploadData.append("folder", "ztech/services");
+
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      body: uploadData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.secure_url) {
+      console.error("Cloudinary upload failed:", result);
+
+      throw new Error(
+        result.error?.message || "Image upload failed."
+      );
+    }
+
+    return result.secure_url;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -39,10 +124,17 @@ function AddService() {
     setSaving(true);
 
     try {
+      let imageUrl = formData.image.trim();
+
+      if (selectedImage) {
+        imageUrl = await uploadImage(selectedImage);
+      }
+
       await addDoc(collection(db, "services"), {
         name: formData.name.trim(),
         description: formData.description.trim(),
         icon: formData.icon.trim(),
+        image: imageUrl,
         order: Number(formData.order) || 1,
         active: formData.active,
         createdAt: serverTimestamp(),
@@ -52,8 +144,10 @@ function AddService() {
       navigate("/admin/services");
     } catch (error) {
       console.error("Failed to add service:", error);
+
       setError(
-        "Failed to save service. Please try again."
+        error.message ||
+          "Failed to save service. Please try again."
       );
     } finally {
       setSaving(false);
@@ -63,7 +157,6 @@ function AddService() {
   return (
     <AdminLayout>
       <div className="admin-manager">
-
         <div className="admin-manager-header">
           <div>
             <p className="admin-eyebrow">
@@ -91,7 +184,6 @@ function AddService() {
           onSubmit={handleSubmit}
         >
           <div className="admin-form-section">
-
             <div className="admin-form-section-heading">
               <p>SERVICE DETAILS</p>
 
@@ -101,7 +193,6 @@ function AddService() {
             </div>
 
             <div className="admin-form-grid">
-
               <div className="admin-field">
                 <label htmlFor="name">
                   Service Name
@@ -133,7 +224,7 @@ function AddService() {
                 />
 
                 <small>
-                  For now, enter a short text or symbol.
+                  Enter a short text or symbol for the service icon.
                 </small>
               </div>
 
@@ -151,6 +242,69 @@ function AddService() {
                   rows="5"
                   required
                 />
+              </div>
+
+              <div className="admin-field admin-field-full">
+                <label htmlFor="serviceImage">
+                  Service Image
+                </label>
+
+                <input
+                  id="serviceImage"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageChange}
+                />
+
+                <small>
+                  Choose a JPG, PNG, or WebP image up to 5 MB.
+                  It uploads when you save the service.
+                </small>
+
+                {previewUrl && (
+                  <div style={{ marginTop: "12px" }}>
+                    <p>Image preview</p>
+
+                    <img
+                      src={previewUrl}
+                      alt="Selected service preview"
+                      style={{
+                        width: "100%",
+                        maxWidth: "420px",
+                        maxHeight: "260px",
+                        objectFit: "cover",
+                        borderRadius: "12px",
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      className="admin-secondary-button"
+                      style={{ marginTop: "10px" }}
+                      onClick={() => setSelectedImage(null)}
+                    >
+                      Remove selected image
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ marginTop: "16px" }}>
+                  <label htmlFor="image">
+                    Or use an existing image URL
+                  </label>
+
+                  <input
+                    id="image"
+                    name="image"
+                    type="url"
+                    value={formData.image}
+                    onChange={(event) => {
+                      handleChange(event);
+                      setSelectedImage(null);
+                    }}
+                    placeholder="https://example.com/service-image.jpg"
+                  />
+                </div>
               </div>
 
               <div className="admin-field">
@@ -171,12 +325,10 @@ function AddService() {
                   Lower numbers appear first.
                 </small>
               </div>
-
             </div>
           </div>
 
           <div className="admin-form-section">
-
             <div className="admin-form-section-heading">
               <p>DISPLAY SETTINGS</p>
 
@@ -201,7 +353,6 @@ function AddService() {
                 </small>
               </span>
             </label>
-
           </div>
 
           {error && (
@@ -211,11 +362,11 @@ function AddService() {
           )}
 
           <div className="admin-form-actions">
-
             <button
               type="button"
               className="admin-secondary-button"
               onClick={() => navigate("/admin/services")}
+              disabled={saving}
             >
               Cancel
             </button>
@@ -225,12 +376,14 @@ function AddService() {
               className="admin-primary-button"
               disabled={saving}
             >
-              {saving ? "Saving..." : "Save Service"}
+              {saving
+                ? selectedImage
+                  ? "Uploading image and saving..."
+                  : "Saving..."
+                : "Save Service"}
             </button>
-
           </div>
         </form>
-
       </div>
     </AdminLayout>
   );

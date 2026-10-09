@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   addDoc,
   collection,
@@ -8,6 +8,16 @@ import { useNavigate } from "react-router-dom";
 
 import { db } from "../../../config/firebase";
 import AdminLayout from "../../../components/admin/AdminLayout";
+
+const CLOUDINARY_CLOUD_NAME = "rwllkept";
+const CLOUDINARY_UPLOAD_PRESET = "ztech_images";
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
 
 function AddProject() {
   const navigate = useNavigate();
@@ -22,8 +32,22 @@ function AddProject() {
     featured: false,
   });
 
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!selectedImage) {
+      setPreviewUrl("");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(selectedImage);
+    setPreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedImage]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -34,6 +58,66 @@ function AddProject() {
     }));
   };
 
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+
+    setError("");
+
+    if (!file) {
+      setSelectedImage(null);
+      return;
+    }
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setError("Choose a JPG, PNG, or WebP image.");
+      event.target.value = "";
+      setSelectedImage(null);
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError("The image must be 5 MB or smaller.");
+      event.target.value = "";
+      setSelectedImage(null);
+      return;
+    }
+
+    setSelectedImage(file);
+
+    // Clear the URL when choosing a new file.
+    setFormData((previous) => ({
+      ...previous,
+      image: "",
+    }));
+  };
+
+  const uploadImage = async (file) => {
+    const uploadUrl =
+      `https://api.cloudinary.com/v1_1/` +
+      `${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+    uploadData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    uploadData.append("folder", "ztech/projects");
+
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      body: uploadData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.secure_url) {
+      console.error("Cloudinary upload failed:", result);
+      throw new Error(
+        result.error?.message || "Image upload failed."
+      );
+    }
+
+    return result.secure_url;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -41,6 +125,12 @@ function AddProject() {
     setSaving(true);
 
     try {
+      let imageUrl = formData.image.trim();
+
+      if (selectedImage) {
+        imageUrl = await uploadImage(selectedImage);
+      }
+
       const technologies = formData.technologies
         .split(",")
         .map((technology) => technology.trim())
@@ -50,7 +140,7 @@ function AddProject() {
         title: formData.title.trim(),
         category: formData.category,
         description: formData.description.trim(),
-        image: formData.image.trim(),
+        image: imageUrl,
         website: formData.website.trim(),
         technologies,
         featured: formData.featured,
@@ -61,7 +151,10 @@ function AddProject() {
       navigate("/admin/projects");
     } catch (error) {
       console.error("Failed to add project:", error);
-      setError("Failed to save project. Please try again.");
+      setError(
+        error.message ||
+          "Failed to save project. Please try again."
+      );
     } finally {
       setSaving(false);
     }
@@ -70,7 +163,6 @@ function AddProject() {
   return (
     <AdminLayout>
       <div className="admin-manager">
-
         <div className="admin-manager-header">
           <div>
             <p className="admin-eyebrow">
@@ -98,7 +190,6 @@ function AddProject() {
           onSubmit={handleSubmit}
         >
           <div className="admin-form-section">
-
             <div className="admin-form-section-heading">
               <p>PROJECT DETAILS</p>
 
@@ -108,7 +199,6 @@ function AddProject() {
             </div>
 
             <div className="admin-form-grid">
-
               <div className="admin-field">
                 <label htmlFor="title">
                   Project Name
@@ -140,31 +230,24 @@ function AddProject() {
                   <option value="">
                     Select a category
                   </option>
-
                   <option value="Web Development">
                     Web Development
                   </option>
-
                   <option value="Custom Software">
                     Custom Software
                   </option>
-
                   <option value="E-Commerce / Logistics">
                     E-Commerce / Logistics
                   </option>
-
                   <option value="AI & Automation">
                     AI & Automation
                   </option>
-
                   <option value="IT Solutions">
                     IT Solutions
                   </option>
-
                   <option value="Digital Platforms">
                     Digital Platforms
                   </option>
-
                   <option value="Other">
                     Other
                   </option>
@@ -203,23 +286,64 @@ function AddProject() {
               </div>
 
               <div className="admin-field admin-field-full">
-                <label htmlFor="image">
-                  Project Image URL
+                <label htmlFor="projectImage">
+                  Project Image
                 </label>
 
                 <input
-                  id="image"
-                  name="image"
-                  type="url"
-                  value={formData.image}
-                  onChange={handleChange}
-                  placeholder="https://example.com/project-image.jpg"
+                  id="projectImage"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageChange}
                 />
 
                 <small>
-                  For now, use an image URL. We'll add direct
-                  image uploads later with Firebase Storage.
+                  Choose a JPG, PNG, or WebP image up to 5 MB.
+                  It will upload to Cloudinary when you save.
                 </small>
+
+                {previewUrl && (
+                  <div style={{ marginTop: "12px" }}>
+                    <p>Image preview</p>
+                    <img
+                      src={previewUrl}
+                      alt="Selected project preview"
+                      style={{
+                        width: "100%",
+                        maxWidth: "420px",
+                        maxHeight: "260px",
+                        objectFit: "cover",
+                        borderRadius: "12px",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="admin-secondary-button"
+                      style={{ marginTop: "10px" }}
+                      onClick={() => setSelectedImage(null)}
+                    >
+                      Remove selected image
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ marginTop: "16px" }}>
+                  <label htmlFor="image">
+                    Or use an existing image URL
+                  </label>
+
+                  <input
+                    id="image"
+                    name="image"
+                    type="url"
+                    value={formData.image}
+                    onChange={(event) => {
+                      handleChange(event);
+                      setSelectedImage(null);
+                    }}
+                    placeholder="https://example.com/project-image.jpg"
+                  />
+                </div>
               </div>
 
               <div className="admin-field admin-field-full">
@@ -240,12 +364,10 @@ function AddProject() {
                   Separate technologies with commas.
                 </small>
               </div>
-
             </div>
           </div>
 
           <div className="admin-form-section">
-
             <div className="admin-form-section-heading">
               <p>DISPLAY SETTINGS</p>
 
@@ -264,13 +386,11 @@ function AddProject() {
 
               <span>
                 <strong>Featured Project</strong>
-
                 <small>
                   Highlight this project on the public website.
                 </small>
               </span>
             </label>
-
           </div>
 
           {error && (
@@ -280,11 +400,11 @@ function AddProject() {
           )}
 
           <div className="admin-form-actions">
-
             <button
               type="button"
               className="admin-secondary-button"
               onClick={() => navigate("/admin/projects")}
+              disabled={saving}
             >
               Cancel
             </button>
@@ -294,12 +414,14 @@ function AddProject() {
               className="admin-primary-button"
               disabled={saving}
             >
-              {saving ? "Saving..." : "Save Project"}
+              {saving
+                ? selectedImage
+                  ? "Uploading image and saving..."
+                  : "Saving..."
+                : "Save Project"}
             </button>
-
           </div>
         </form>
-
       </div>
     </AdminLayout>
   );
