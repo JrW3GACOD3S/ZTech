@@ -73,7 +73,7 @@ function Services() {
                     className="service-card-image"
                     style={{
                       width: "100%",
-                      aspectRatio: "16 / 9",
+                      aspectRatio: "4 / 3",
                       overflow: "hidden",
                       borderRadius: "10px",
                       marginBottom: "20px",
@@ -85,11 +85,12 @@ function Services() {
                       alt={service.name || "ZTECH service"}
                       loading="lazy"
                       style={{
-                        display: "block",
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
+                       display: "block",
+                       width: "100%",
+                       height: "100%",
+                       objectFit: "cover",
+                       objectPosition: "center",
+}}
                       onError={(event) => {
                         event.currentTarget.parentElement.style.display =
                           "none";
